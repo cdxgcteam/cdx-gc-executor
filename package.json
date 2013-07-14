@@ -1,0 +1,34 @@
+{
+	"name": "cdx-gc-executor",
+	"version": "0.0.1",
+	"private": true,
+	"description": "CDX Grey Cell Executor - This is the execution component to the CDX Grey Cell Automation platform. The key execution methodology is Selenium.",
+	"keywords" : [
+		"cdx",
+		"graycell",
+		"executor"
+	],
+	"author" : {
+		"name": "Derek Yap",
+		"email": "zangzi@gmail.com"
+	},
+	"contributor": [],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/splytech/cdx-gc-executor.git"
+	},
+	"dependencies": {
+		"amqp": "0.1.x",
+		"selenium-webdriver":"2.33.x",
+		"winston": "0.7.x",
+		"commander": "1.3.x",
+		"q": "0.9.x"
+	},
+	"engines": {
+		"node" : ">=0.10.0"
+	},
+	"scripts": {
+		"start": "node executor.js"
+	}
+	
+}
