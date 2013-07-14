@@ -19,6 +19,7 @@
 	},
 	"dependencies": {
 		"amqp": "0.1.x",
+		"browsermob-proxy": "*",
 		"selenium-webdriver":"2.33.x",
 		"winston": "0.7.x",
 		"commander": "1.3.x",
