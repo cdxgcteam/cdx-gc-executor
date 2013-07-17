@@ -21,8 +21,11 @@
 		"amqp": "0.1.x",
 		"browsermob-proxy": "*",
 		"selenium-webdriver":"2.33.x",
+		"webdriverjs": "0.7.x",
 		"winston": "0.7.x",
 		"commander": "1.3.x",
+		"underscore": "1.5.x",
+		"async": "0.2.x",
 		"q": "0.9.x"
 	},
 	"engines": {
