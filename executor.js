@@ -1,96 +1,127 @@
+// ----------------------------
+// Info:
+// ----------------------------
+// Title: cdxgc_manager_server.js
+// Description: CDX Grey Cell Manager Server
+// Author: Derek Yap <zangzi@gmail.com>
+// License: MIT
+// Version: 0.0.1
 var version = '0.0.1';
-// Node JS Requires:
+
+// ----------------------------
+// Requires:
+// ----------------------------
+// - Built-ins:
 var util = require('util');
 var fs = require("fs");
 var exec = require('child_process').execFile;
 var os = require('os');
 
-// Selenium Requires:
+// - BrowserMob Proxy
 var bmp = require('browsermob-proxy').Proxy;
+
+// - Selenium Web Driver Module
 var webdriver = require('selenium-webdriver');
-var SeleniumServer = require('selenium-webdriver/remote').SeleniumServer; // They need to update their docs. I think this might be a mistake.
 
-// Support Module Requires:
+// - Selenium Server Control Module
+var SeleniumServer = require('selenium-webdriver/remote').SeleniumServer;
+
+// - Commander (Command Line Utility)
 var cmdr = require('commander');
-var _ = require("underscore");
-var q = require("q");
 
+// - Lodash
+var _ = require('lodash-node');
 
-// Global Statics:
-var SELENIUM_LINUX_DEFAULT_PATH = './selenium/selenium-server-standalone-2.33.0.jar';
-var SELENIUM_WINDOWS_DEFAULT_PATH = '.\\selenium\\selenium-server-standalone-2.33.0.jar';
-var BROWSERMOB_LINUX_DEFAULT_PATH = './browsermob/browsermob-proxy-2.0-beta-8/bin/browsermob-proxy';
-var BROWSERMOB_WINDOWS_DEFAULT_PATH = '.\\browsermob\\browsermob-proxy-2.0-beta-8\\bin\\browsermob-proxy.bat';
+// - Promises...
+var when = require("when");
+var all = require('when').all;
 
-cmdr.version(version)
-	.option('-c, --config_file <path>', 'Path to executor configuration file')
-	.on('--help', function(){
-	  console.log('*** To get command syntax for different commands use the \'<command> --help\' pattern.');
-	  console.log('');	
-	});
+// - AMQP -> RabbitMQ Connection Library
+var amqp = require('amqplib');
 
-cmdr.command('central')
-	.description('Central Server Executor -- Use RabbitMQ Messaging server to recieve tasking.')
-	.option('-rh, --r_hostname <hostname>', 'RabbitMQ Server Hostname')
-	.option('-rp, --r_port <n>', 'RabbitMQ Server Port', parseInt)
-	.option('-ru, --r_user <username>','RabbitMQ Server Username')
-	.option('-rp, --r_pass <password>', 'RabbitMQ Server Username')
-	.option('-rv, --r_vhost <vhost>', 'RabbitMQ Server Username')
-	.option('-s, --sel <path>', 'Path to Selenium JAR File', verifySeleniumPath)
-	.option('-sh, --sel_hostname <hostname>', 'Selenium execution hostname')
-	.option('-sp, --sel_port <n>', 'Selenium execution port number', parseInt)
+// - moment - Date Formatter:
+var moment = require('moment');
+
+// - Logging
+var winston = require('winston');
+var logger = new (winston.Logger)({
+	exitOnError: false,
+	transports: [
+		new (winston.transports.Console)({level: 'debug', colorize: true, timestamp: true})//,
+		//new (winston.transports.File)({ filename: 'info.log' })
+	]//,
+	// exceptionHandlers: [
+	// 	new winston.transports.File({ filename: 'exceptions.log' })
+	// ]
+});
+
+// ----------------------------
+// GLOBALS:
+// ----------------------------
+var SELENIUM_LINUX_DEFAULT_PATH = './selenium/selenium-server-standalone-2.41.0.jar';
+var SELENIUM_WINDOWS_DEFAULT_PATH = '.\\selenium\\selenium-server-standalone-2.41.0.jar';
+var BROWSERMOB_LINUX_DEFAULT_PATH = './browsermob/browsermob-proxy-2.0-beta-9/bin/browsermob-proxy';
+var BROWSERMOB_WINDOWS_DEFAULT_PATH = '.\\browsermob\\browsermob-proxy-2.0-beta-9\\bin\\browsermob-proxy.bat';
+
+var SELENIUM_HOST = 'localhost';
+var SELENIUM_PORT = 4444;
+var BROWSERMOB_HOST = 'localhost';
+var BROWSERMOB_PORT = 8080;
+
+var AMQP_IP = "10.0.20.32";
+var AMQP_PORT = 5672;
+var AMQP_RESULTS_EXCHANGE = "direct_cdxresults";
+var AMQP_RESULTS_ROUTING_KEY = "task_results";
+
+var AMQP_TASK_EXCHANGE = "topic_cdxtasks";
+var AMQP_TASK_BINDING_KEYS = ["all.*", "navy.linux.*"];
+
+var AMQP_CH = null;
+
+// ----------------------------
+// Commander:
+// ----------------------------
+cmdr.description('CDX GreyCell Executor -- Executes tasking from central server')
+	.option('-u, --school <school>', 'Please specify ', AMQP_IP)
+	.option('-ah, --amqp_host <server name or IP>', 'AMQP Server Hostname', AMQP_IP)
+	.option('-ap, --amqp_port <port number>', 'AMQP Server Port', parseInt, AMQP_PORT)
+	.option('-s,  --sel <path>', 'Path to Selenium JAR File', verifySeleniumPath)
+	.option('-sh, --sel_hostname <hostname>', 'Selenium execution hostname', SELENIUM_HOST)
+	.option('-sp, --sel_port <n>', 'Selenium execution port number', parseInt, SELENIUM_PORT)
 	.option('-px, --proxy_path [path]', 'Use Browsermob Proxy', verifyBrowserMobPath)
-	.option('-ph, --proxy_hostname <hostname>', 'Browsermob proxy hostname', parseInt)
-	.option('-pp, --proxy_port <n>', 'Browsermob proxy control port', parseInt)
-	.action(function(centralCmdr) {
-		
-		// Deal with options:
-		var opt = centralOptionGenerator(centralCmdr);
-		
-		console.log('Arguments: ',util.inspect(centralCmdr, {colors: true}));
-		console.log('Options: ',util.inspect(opt, {colors: true}));
-		
-		// Start the Processors:
-		var prom_proxy = centralSetup(opt);
-		console.log('prom_proxy: ',util.inspect(prom_proxy, {colors: true}));
-		prom_proxy.then(function (responseText) {
-		    // If the HTTP response returns 200 OK, log the response text.
-		    console.log(responseText);
-			console.log(opt);
-		});
-	});
+	.option('-ph, --proxy_hostname <hostname>', 'Browsermob proxy hostname', BROWSERMOB_HOST)
+	.option('-pp, --proxy_port <n>', 'Browsermob proxy control port', parseInt, BROWSERMOB_PORT)
+	.parse(process.argv);
 
-cmdr.parse(process.argv);
+logger.debug(util.inspect(os.platform(), {colors: true}));
 
-console.log(util.inspect(os.platform(), {colors: true}));
-
-function centralOptionGenerator(cmdrOpts) {
-	var selenium = {};
-	var rabbit = {};
-	var browsermob = {};
-	
-	selenium.path = verifySeleniumPath(cmdrOpts.sel);
-	selenium.host = cmdrOpts.sel_hostname || 'localhost';
-	selenium.port = cmdrOpts.sel_port || 4444;
-	
-	rabbit.host = cmdrOpts.r_hostname || 'localhost';
-	rabbit.port = cmdrOpts.r_port || 5672;
-	rabbit.user = cmdrOpts.r_user || 'guest';
-	rabbit.pass = cmdrOpts.r_pass || 'guest';
-	rabbit.vhost = cmdrOpts.r_vhost || '/';
-	
-	browsermob.path = verifyBrowserMobPath(cmdrOpts.proxy_path);
-	browsermob.host = cmdrOpts.proxy_hostname || 'localhost';
-	browsermob.port = cmdrOpts.proxy_port || 8080;
-	
-	var opt = {};
-	opt.s = selenium;
-	opt.r = rabbit;
-	opt.b = browsermob;
-	
-	console.log('centralOptionGenerator: ',util.inspect(opt, {colors: true}));
-	return opt;
-}
+// function centralOptionGenerator(cmdrOpts) {
+// 	var selenium = {};
+// 	var rabbit = {};
+// 	var browsermob = {};
+// 	
+// 	selenium.path = verifySeleniumPath(cmdrOpts.sel);
+// 	selenium.host = cmdrOpts.sel_hostname || 'localhost';
+// 	selenium.port = cmdrOpts.sel_port || 4444;
+// 	
+// 	rabbit.host = cmdrOpts.r_hostname || 'localhost';
+// 	rabbit.port = cmdrOpts.r_port || 5672;
+// 	rabbit.user = cmdrOpts.r_user || 'guest';
+// 	rabbit.pass = cmdrOpts.r_pass || 'guest';
+// 	rabbit.vhost = cmdrOpts.r_vhost || '/';
+// 	
+// 	browsermob.path = verifyBrowserMobPath(cmdrOpts.proxy_path);
+// 	browsermob.host = cmdrOpts.proxy_hostname || 'localhost';
+// 	browsermob.port = cmdrOpts.proxy_port || 8080;
+// 	
+// 	var opt = {};
+// 	opt.s = selenium;
+// 	opt.r = rabbit;
+// 	opt.b = browsermob;
+// 	
+// 	logger.debug('centralOptionGenerator: ',util.inspect(opt, {colors: true}));
+// 	return opt;
+// }
 
 function verifyBrowserMobPath(inputPath) {
 	var browsermob_path = '';
@@ -126,7 +157,13 @@ function verifySeleniumPath(inputPath) {
 	}
 }
 
+// ----------------------------
+// Main:
+// ----------------------------
 
+var start = function () {
+	
+};
 
 function centralSetup(options) {
 
@@ -147,14 +184,14 @@ function centralSetup(options) {
 }
 
 function doSelenium(proxy, cb) {
-	console.log(util.inspect(SeleniumServer, {colors: true}));
+	logger.debug(util.inspect(SeleniumServer, {colors: true}));
 
 	var server = new SeleniumServer({
 	  jar: selenium_path,
 	  port: 4444
 	});
 
-	console.log(util.inspect(SeleniumServer, {colors: true}));
+	logger.debug(util.inspect(SeleniumServer, {colors: true}));
 
 	server.start();
 
@@ -178,3 +215,45 @@ function doSelenium(proxy, cb) {
 	driver.quit();
 	server.stop();
 }
+
+var message = 'Hello World!';
+var logMessage = function(msg) {
+	console.log(" [x] %s:'%s'",
+				msg.fields.routingKey,
+				msg.content.toString());
+	AMQP_CH.ack(msg);
+	AMQP_CH.publish(AMQP_RESULTS_EXCHANGE, AMQP_RESULTS_ROUTING_KEY, new Buffer(message));
+	console.log(" RESULT!! Sent %s:'%s'", message);
+};
+
+var amqpServerPath = 'amqp://'+cmdr.amqp_host+':'+cmdr.amqp_port;
+logger.info('AMQP Path: '+amqpServerPath);
+amqp.connect(amqpServerPath).then(function(conn) {
+	return when(conn.createChannel().then(function(ch) {
+		AMQP_CH = ch;
+		var tasks = ch.assertExchange(AMQP_TASK_EXCHANGE, 'topic', {durable: false});
+		
+	    tasks = tasks.then(function() {
+			logger.info('AMQP :: Tasks Exchange Asserted.');
+			return ch.assertQueue('', {exclusive: true});
+	    });
+		
+	    tasks = tasks.then(function(qok) {
+			logger.info('AMQP :: Tasks Queue Asserted.');
+			var queue = qok.queue;
+			return all(AMQP_TASK_BINDING_KEYS.map(function(rk) {
+				ch.bindQueue(queue, AMQP_TASK_EXCHANGE, rk);
+			})).then(function() {
+				logger.info('AMQP :: Tasks Queues Binded.');
+				return queue;
+			});
+	    });
+		
+		tasks = tasks.then(function(queue) {
+			return ch.consume(queue, logMessage, {noAck: false});
+		});
+		return tasks.then(function() {
+			logger.info(' AMQP :: Waiting for tasks. To exit press CTRL+C.');
+		});
+	}));
+}).then(null, console.warn);

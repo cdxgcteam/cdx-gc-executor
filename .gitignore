@@ -6,9 +6,14 @@ lib-cov
 *.out
 *.pid
 *.gz
+*.exe
+*.jar
 
 pids
 logs
 results
+src_files
+node_modules
+browsermob-proxy-2.0-beta-9
 
 npm-debug.log
