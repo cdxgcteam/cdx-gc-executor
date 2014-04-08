@@ -49,8 +49,8 @@ var winston = require('winston');
 var logger = new (winston.Logger)({
 	exitOnError: false,
 	transports: [
-		new (winston.transports.Console)({level: 'debug', colorize: true, timestamp: true})//,
-		//new (winston.transports.File)({ filename: 'info.log' })
+		new (winston.transports.Console)({level: 'debug', colorize: true, timestamp: true}),
+		new (winston.transports.File)({level: 'debug', timestamp: true, filename: 'info.log' })
 	]//,
 	// exceptionHandlers: [
 	// 	new winston.transports.File({ filename: 'exceptions.log' })
@@ -75,7 +75,7 @@ var BROWSERMOB_PORT = 8080;
 var SELENIUM_SERVER = null;
 var SELENIUM_DRIVER = null;
 
-var AMQP_IP = "10.0.20.32";
+var AMQP_IP = "10.1.10.72";
 var AMQP_PORT = 5672;
 var AMQP_RESULTS_EXCHANGE = "direct_cdxresults";
 var AMQP_RESULTS_ROUTING_KEY = "task_results";
@@ -271,6 +271,7 @@ var sendResult = function(amqpmsg, taskID, output, startTime) {
 	result.executor = EXECUTOR;
 	result.os_platform = os.platform();
 	result.os_release = os.release();
+	result.browser = cmdr.browser;
 	result.startTime = startTime;
 	result.endTime = Date.now();
 	result.elapsedTime = result.endTime - result.startTime;
@@ -337,6 +338,7 @@ start().then(function () {
 			    }).
 			    build();
 		} else if (cmdr.browser === 'firefox') {
+			// Selenium will have to be started MANUALLY!!!!...
 			var serverAddress = 'http://localhost:'+cmdr.sel_port+'/wd/hub';
 			var driver = new webdriver.Builder().
 				usingServer(serverAddress).

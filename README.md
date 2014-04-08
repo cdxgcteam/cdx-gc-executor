@@ -32,4 +32,60 @@ Important Links:
 	
 Install:
 
+Download one of the following files based on the OS of the system:
+
+	cdxexecutor-linux-0.0.2.tar.gz
+	cdxexecutor-windows-0.0.2.exe
+
+NOTE: The windows version is a 7Zip self-extracting archive. The linux version assumes tar and gzip is installed.
+
+In Windows:
+
+1. Double click on the cdxexecutor-windows-0.0.2.exe file and put it in your working directory.
+2. Go to the Run command or click the Search box in Windows Menu.
+3. Type "cmd" and hit enter.
+4. Follows steps 1 and 2 again.
+5. You should now have two CMD shells open.
+6. Change the directory of both shells to where you put windows cdxexecutor files.
+7. In one of the shells type:
+
+		.\run_selenium.bat
+
+8. If that was successful, then it should run stay running and a bunch of log message should show up on the screen.
+9. On the other shell type:\
+
+		.\node.exe executor.js -s <your school> -m <the machine> -b <your browser choice>
+
+	Example(s):
 	
+		.\node.exe executor.js -s navy -m win7 -b ie
+		.\node.exe executor.js -s airforce -m winXP -b firefox
+
+10. If you see log message like "Waiting for tasks..." then everything is working.
+11. Just watch the show. Get a cup of coffee, you are done for now.
+
+In Linux:
+
+1. Start "Terminal".
+2. Open 2 terminals or 2 tabs.
+3. Change the directory on both terminals to the same place you put linux tar file.
+4. Expand the tar file:
+	
+		tar -vxzf cdxexecutor-linux-0.0.2.tar.gz
+
+5. In one of the shells type:
+
+		./run_selenium.sh
+
+6. If that was successful, then it should run stay running and a bunch of log message should show up on the screen.
+7. On the other shell type:\
+
+		./node executor.js -s <your school> -m <the machine> -b <your browser choice>
+
+	Example(s):
+	
+		.\node.exe executor.js -s navy -m win7 -b ie
+		.\node.exe executor.js -s airforce -m winXP -b firefox
+
+8. If you see log message like "Waiting for tasks..." then everything is working.
+9. Just watch the show. Get a cup of coffee, you are done for now.

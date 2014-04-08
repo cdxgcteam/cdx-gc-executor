@@ -12,6 +12,8 @@ lib-cov
 pids
 logs
 results
+linux
+windows
 src_files
 node_modules
 browsermob-proxy-2.0-beta-9
